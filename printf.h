@@ -58,6 +58,15 @@ void _putchar(char character);
 
 
 /**
+ * Output a character to a custom device like UART, used by the fprintf() function
+ * This function is declared here only. You have to write your custom implementation somewhere
+ * \param character Character to output
+ * \param stream A pointer to the stream/file/UART where to write the formatted string
+ */
+void _putc(char character, void* stream);
+
+
+/**
  * Tiny printf implementation
  * You have to implement _putchar if you use printf()
  * To avoid conflicts with the regular printf() API it is overridden by macro defines
@@ -104,6 +113,20 @@ int vsnprintf_(char* buffer, size_t count, const char* format, va_list va) ATTR_
  */
 #define vprintf vprintf_
 int vprintf_(const char* format, va_list va) ATTR_PRINTF(1, 0);
+
+
+/**
+ * Tiny fprintf/vfprintf implementation
+ * You have to implement _putc if you use (v)fprintf()
+ * \param stream A pointer passed to _putc() indicating the destination stream/file/UART
+ * \param format A string that specifies the format of the output
+ * \param va A value identifying a variable arguments list
+ * \return The number of characters that are sent to the stream, not counting the terminating null character
+ */
+#define  fprintf  fprintf_
+#define vfprintf vfprintf_
+int  fprintf_(void* stream, const char* format, ...)        ATTR_PRINTF(2, 3);
+int vfprintf_(void* stream, const char* format, va_list va) ATTR_PRINTF(2, 0);
 
 
 /**
