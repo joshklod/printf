@@ -51,6 +51,19 @@ void test::_putchar(char character)
   printf_buffer[printf_idx++] = character;
 }
 
+// dummy putc
+typedef struct {
+  char   buffer[32];
+  size_t idx;
+} dummy_stream_st;
+static dummy_stream_st stream[3];
+
+void test::_putc(char character, void* stream)
+{
+  dummy_stream_st *s = (dummy_stream_st *)stream;
+  s->buffer[s->idx++] = character;
+}
+
 void _out_fct(char character, void* arg)
 {
   (void)arg;
@@ -87,6 +100,21 @@ TEST_CASE("snprintf", "[]" ) {
   REQUIRE(!strcmp(buffer, "-1"));
 }
 
+
+TEST_CASE("fprintf", "[]" ) {
+  for (int i = 0; i < 3; i++) {
+    stream[i].idx = 0U;
+    memset(stream[i].buffer, 0xCC, 32U);
+    test::fprintf(&stream[i], "stream %d", i);
+    REQUIRE(stream[i].buffer[8] == (char)0xCC);
+    stream[i].buffer[8] = 0;
+  }
+  REQUIRE(!strcmp(stream[0].buffer, "stream 0"));
+  REQUIRE(!strcmp(stream[1].buffer, "stream 1"));
+  REQUIRE(!strcmp(stream[2].buffer, "stream 2"));
+}
+
+
 static void vprintf_builder_1(char* buffer, ...)
 {
   va_list args;
@@ -111,6 +139,14 @@ static void vsnprintf_builder_3(char* buffer, ...)
   va_end(args);
 }
 
+static void vfprintf_builder_1(dummy_stream_st* stream, ...)
+{
+  va_list args;
+  va_start(args, stream);
+  test::vfprintf(stream, "vfprintf %d", args);
+  va_end(args);
+}
+
 
 TEST_CASE("vprintf", "[]" ) {
   char buffer[100];
@@ -131,6 +167,20 @@ TEST_CASE("vsnprintf", "[]" ) {
 
   vsnprintf_builder_3(buffer, 3, -1000, "test");
   REQUIRE(!strcmp(buffer, "3 -1000 test"));
+}
+
+
+TEST_CASE("vfprintf", "[]" ) {
+  for (int i = 0; i < 3; i++) {
+    stream[i].idx = 0U;
+    memset(stream[i].buffer, 0xCC, 32U);
+    vfprintf_builder_1(&stream[i], i);
+    REQUIRE(stream[i].buffer[10] == (char)0xCC);
+    stream[i].buffer[10] = 0;
+  }
+  REQUIRE(!strcmp(stream[0].buffer, "vfprintf 0"));
+  REQUIRE(!strcmp(stream[1].buffer, "vfprintf 1"));
+  REQUIRE(!strcmp(stream[2].buffer, "vfprintf 2"));
 }
 
 
