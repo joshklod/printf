@@ -1589,9 +1589,6 @@ static int vsnprintf_impl(output_gadget_t* output, const char* format, va_list a
    */
   format_string_loop(output, format, args);
 
-  /* termination */
-  append_termination_via_gadget(output);
-
   /* return written chars without terminating \0 */
   return (int)output->pos;
 }
@@ -1606,8 +1603,11 @@ int vprintf_(const char* format, va_list arg)
 
 int vsnprintf_(char* s, size_t n, const char* format, va_list arg)
 {
+  int ret;
   output_gadget_t gadget = buffer_gadget(s, n);
-  return vsnprintf_impl(&gadget, format, arg);
+  ret = vsnprintf_impl(&gadget, format, arg);
+  append_termination_via_gadget(&gadget);
+  return ret;
 }
 
 int vsprintf_(char* s, const char* format, va_list arg)
