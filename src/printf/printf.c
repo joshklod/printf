@@ -427,18 +427,17 @@ static inline void putchar_via_gadget(output_gadget_t* gadget, char c)
   }
 }
 
-/* Possibly-write the string-terminating '\0' character */
+/* Write the string-terminating '\0' character */
 static inline void append_termination_via_gadget(output_gadget_t* gadget)
 {
   printf_size_t null_char_pos;
   if (gadget->function != NULL) {
-    return;
+    gadget->function('\0', gadget->extra_function_arg);
   }
-  if (gadget->buffer == NULL) {
-    return;
+  else if (gadget->buffer != NULL) {
+    null_char_pos = gadget->pos < gadget->max_chars ? gadget->pos : gadget->max_chars;
+    gadget->buffer[null_char_pos] = '\0';
   }
-  null_char_pos = gadget->pos < gadget->max_chars ? gadget->pos : gadget->max_chars;
-  gadget->buffer[null_char_pos] = '\0';
 }
 
 /*
