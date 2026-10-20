@@ -260,11 +260,7 @@ typedef long          printf_signed_value_t;
  */
 typedef unsigned int printf_size_t;
 #define PRINTF_MAX_POSSIBLE_BUFFER_SIZE INT_MAX
-  /*
-   * If we were to nitpick, this would actually be INT_MAX + 1,
-   * since INT_MAX is the maximum return value, which excludes the
-   * trailing '\0'.
-   */
+  /* Excludes the trailing '\0'. */
 
 #define SIGN(_negative,_x) ( (_negative) ? -(_x) : (_x))
 
@@ -435,13 +431,13 @@ static inline void putchar_via_gadget(output_gadget_t* gadget, char c)
 static inline void append_termination_via_gadget(output_gadget_t* gadget)
 {
   printf_size_t null_char_pos;
-  if (gadget->function != NULL || gadget->max_chars == 0) {
+  if (gadget->function != NULL) {
     return;
   }
   if (gadget->buffer == NULL) {
     return;
   }
-  null_char_pos = gadget->pos < gadget->max_chars ? gadget->pos : gadget->max_chars - 1;
+  null_char_pos = gadget->pos < gadget->max_chars ? gadget->pos : gadget->max_chars;
   gadget->buffer[null_char_pos] = '\0';
 }
 
@@ -1604,9 +1600,11 @@ int vprintf_(const char* format, va_list arg)
 int vsnprintf_(char* s, size_t n, const char* format, va_list arg)
 {
   int ret;
-  output_gadget_t gadget = buffer_gadget(s, n);
+  output_gadget_t gadget = buffer_gadget(s, (n > 0) ? n - 1 : 0);
   ret = vsnprintf_impl(&gadget, format, arg);
-  append_termination_via_gadget(&gadget);
+  if (n > 0) {
+    append_termination_via_gadget(&gadget);
+  }
   return ret;
 }
 
