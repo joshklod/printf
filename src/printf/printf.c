@@ -385,15 +385,13 @@ static inline int get_exp2(floating_point_with_bit_access x)
  *
  * One of the following must hold:
  * 1. max_chars is 0
- * 2. buffer is non-null
- * 3. function is non-null
+ * 2. function is non-null
  *
  * ... otherwise bad things will happen.
  */
 typedef struct {
   void (*function)(char c, void* extra_arg);
   void* extra_function_arg;
-  char* buffer;
   printf_size_t pos;
   printf_size_t max_chars;
 } output_gadget_t;
@@ -411,33 +409,31 @@ static inline void putchar_via_gadget(output_gadget_t* gadget, char c)
      * We're _always_ increasing pos, so as to count how may characters
      * _would_ have been written if not for the max_chars limitation
      */
-  if (write_pos >= gadget->max_chars) {
-    return;
-  }
-  if (gadget->function != NULL) {
+  if (write_pos < gadget->max_chars) {
     /* No check for c == '\0' . */
     gadget->function(c, gadget->extra_function_arg);
-  }
-  else {
-    /*
-     * it must be the case that gadget->buffer != NULL , due to the constraint
-     * on output_gadget_t ; and note we're relying on write_pos being non-negative.
-     */
-    gadget->buffer[write_pos] = c;
   }
 }
 
 /* Write the string-terminating '\0' character */
 static inline void append_termination_via_gadget(output_gadget_t* gadget)
 {
-  printf_size_t null_char_pos;
   if (gadget->function != NULL) {
     gadget->function('\0', gadget->extra_function_arg);
   }
-  else if (gadget->buffer != NULL) {
-    null_char_pos = gadget->pos < gadget->max_chars ? gadget->pos : gadget->max_chars;
-    gadget->buffer[null_char_pos] = '\0';
-  }
+}
+
+typedef struct {
+  char* buffer;
+  printf_size_t pos;
+} buffer_accessor_t;
+
+static inline buffer_accessor_t buffer_accessor(char* buffer)
+{
+  buffer_accessor_t result;
+  result.buffer = buffer;
+  result.pos = 0;
+  return result;
 }
 
 /*
@@ -450,27 +446,20 @@ static inline void putchar_wrapper(char c, void* unused)
   putchar_(c);
 }
 
+static inline void append_to_buffer(char c, void* arg)
+{
+  buffer_accessor_t* buffer = (buffer_accessor_t*) arg;
+  buffer->buffer[buffer->pos++] = c;
+}
+
 static inline output_gadget_t discarding_gadget(void)
 {
   output_gadget_t gadget;
   gadget.function = NULL;
   gadget.extra_function_arg = NULL;
-  gadget.buffer = NULL;
   gadget.pos = 0;
   gadget.max_chars = 0;
   return gadget;
-}
-
-static inline output_gadget_t buffer_gadget(char* buffer, size_t buffer_size)
-{
-  printf_size_t usable_buffer_size = (buffer_size > PRINTF_MAX_POSSIBLE_BUFFER_SIZE) ?
-    PRINTF_MAX_POSSIBLE_BUFFER_SIZE : (printf_size_t) buffer_size;
-  output_gadget_t result = discarding_gadget();
-  if (buffer != NULL) {
-    result.buffer = buffer;
-    result.max_chars = usable_buffer_size;
-  }
-  return result;
 }
 
 static inline output_gadget_t function_gadget(void (*function)(char, void*), void* extra_arg)
@@ -485,6 +474,18 @@ static inline output_gadget_t function_gadget(void (*function)(char, void*), voi
 static inline output_gadget_t extern_putchar_gadget(void)
 {
   return function_gadget(putchar_wrapper, NULL);
+}
+
+static inline output_gadget_t buffer_gadget(buffer_accessor_t* buffer, size_t buffer_size)
+{
+  printf_size_t usable_buffer_size = (buffer_size > PRINTF_MAX_POSSIBLE_BUFFER_SIZE) ?
+    PRINTF_MAX_POSSIBLE_BUFFER_SIZE : (printf_size_t) buffer_size;
+  output_gadget_t result = discarding_gadget();
+  if (buffer->buffer != NULL) {
+    result = function_gadget(append_to_buffer, buffer);
+    result.max_chars = usable_buffer_size;
+  }
+  return result;
 }
 
 /*
@@ -1599,7 +1600,8 @@ int vprintf_(const char* format, va_list arg)
 int vsnprintf_(char* s, size_t n, const char* format, va_list arg)
 {
   int ret;
-  output_gadget_t gadget = buffer_gadget(s, (n > 0) ? n - 1 : 0);
+  buffer_accessor_t buffer = buffer_accessor(s);
+  output_gadget_t gadget = buffer_gadget(&buffer, (n > 0) ? n - 1 : 0);
   ret = vsnprintf_impl(&gadget, format, arg);
   if (n > 0) {
     append_termination_via_gadget(&gadget);
