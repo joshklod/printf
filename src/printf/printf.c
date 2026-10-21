@@ -424,15 +424,13 @@ static inline void append_termination_via_gadget(output_gadget_t* gadget)
 }
 
 typedef struct {
-  char* buffer;
-  printf_size_t pos;
+  char* dst;
 } buffer_accessor_t;
 
 static inline buffer_accessor_t buffer_accessor(char* buffer)
 {
   buffer_accessor_t result;
-  result.buffer = buffer;
-  result.pos = 0;
+  result.dst = buffer;
   return result;
 }
 
@@ -449,7 +447,7 @@ static inline void putchar_wrapper(char c, void* unused)
 static inline void append_to_buffer(char c, void* arg)
 {
   buffer_accessor_t* buffer = (buffer_accessor_t*) arg;
-  buffer->buffer[buffer->pos++] = c;
+  *buffer->dst++ = c;
 }
 
 static inline output_gadget_t discarding_gadget(void)
@@ -481,7 +479,7 @@ static inline output_gadget_t buffer_gadget(buffer_accessor_t* buffer, size_t bu
   printf_size_t usable_buffer_size = (buffer_size > PRINTF_MAX_POSSIBLE_BUFFER_SIZE) ?
     PRINTF_MAX_POSSIBLE_BUFFER_SIZE : (printf_size_t) buffer_size;
   output_gadget_t result = discarding_gadget();
-  if (buffer->buffer != NULL) {
+  if (buffer->dst != NULL) {
     result = function_gadget(append_to_buffer, buffer);
     result.max_chars = usable_buffer_size;
   }
